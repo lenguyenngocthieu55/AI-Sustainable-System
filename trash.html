@@ -1,1 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>AI Nhận Diện Rác</title>
+<style>
+body{
+font-family:Arial;
+background:#e8f5e9;
+text-align:center;
+}
+button{
+padding:10px 20px;
+background:green;
+color:white;
+border:none;
+border-radius:8px;
+}
+</style>
+</head>
 
+<body>
+
+<h1>♻️ AI Nhận Diện Rác</h1>
+
+<input type="file" id="imageUpload">
+
+<br><br>
+
+<button onclick="predict()">Phân tích</button>
+
+<p id="result"></p>
+
+<script>
+function predict(){
+document.getElementById("result")
+.innerHTML="AI đang phân tích loại rác...";
+}
+</script>
+
+</body>
+</html>
