@@ -1,1 +1,31 @@
+<h2>🌱 Chatbot Sống Xanh</h2>
 
+<input id="msg">
+<button onclick="chat()">Gửi</button>
+
+<p id="reply"></p>
+
+<script>
+
+function chat(){
+
+let msg =
+document.getElementById("msg").value;
+
+let answer="";
+
+if(msg.includes("điện"))
+answer="Bạn nên tắt thiết bị khi không sử dụng.";
+
+else if(msg.includes("nhựa"))
+answer="Hạn chế túi nilon và dùng vật liệu tái chế.";
+
+else
+answer="Hãy sống xanh mỗi ngày 🌍";
+
+document.getElementById("reply")
+.innerHTML=answer;
+
+}
+
+</script>
