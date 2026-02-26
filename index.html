@@ -1,72 +1,123 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>AI Sustainable Living</title>
+<title>AI Sustainable System</title>
 
 <style>
+
 body{
+margin:0;
 font-family:Arial;
-background:#eaf7ee;
+background:#eef5f0;
+}
+
+/* Sidebar */
+.sidebar{
+height:100vh;
+width:230px;
+position:fixed;
+background:#1b5e20;
+color:white;
+padding-top:20px;
+}
+
+.sidebar h2{
 text-align:center;
+}
+
+.sidebar button{
+width:100%;
+padding:15px;
+border:none;
+background:none;
+color:white;
+text-align:left;
+cursor:pointer;
+font-size:16px;
+}
+
+.sidebar button:hover{
+background:#2e7d32;
+}
+
+/* Main */
+.main{
+margin-left:230px;
+padding:30px;
 }
 
 .card{
 background:white;
-padding:20px;
-margin:30px auto;
-width:400px;
-border-radius:15px;
-box-shadow:0 0 15px gray;
+padding:25px;
+border-radius:12px;
+box-shadow:0 0 10px gray;
 }
 
-button{
-padding:10px 20px;
-background:green;
-color:white;
-border:none;
-border-radius:8px;
-cursor:pointer;
-}
 </style>
 </head>
 
 <body>
 
-<h1>🌱 AI Sustainable Assistant</h1>
+<div class="sidebar">
+<h2>🌱 AI Green</h2>
 
-<div class="card">
+<button onclick="show('home')">🏠 Trang chủ</button>
+<button onclick="show('waste')">♻️ AI nhận diện rác</button>
+<button onclick="show('chatbot')">🤖 Chatbot sống xanh</button>
+<button onclick="show('score')">🌍 Công dân xanh</button>
+<button onclick="show('predict')">📊 Dự đoán điện nước</button>
+<button onclick="show('advisor')">💬 Tư vấn bền vững</button>
 
-<p>Điện tiêu thụ (kWh)</p>
-<input id="electric" type="number" value="100">
+</div>
 
-<p>Lượng rác (kg)</p>
-<input id="waste" type="number" value="10">
+<div class="main">
 
-<br><br>
+<div id="home" class="card">
+<h2>Hệ thống AI phát triển bền vững</h2>
+<p>Chào mừng đến với nền tảng hỗ trợ lối sống xanh bằng trí tuệ nhân tạo.</p>
+</div>
 
-<button onclick="calculate()">Phân tích AI</button>
+<div id="waste" class="card" style="display:none">
+<h2>♻️ AI nhận diện rác</h2>
+<input type="file">
+<p>AI sẽ phân loại rác từ hình ảnh.</p>
+</div>
 
-<h2 id="result"></h2>
+<div id="chatbot" class="card" style="display:none">
+<h2>🤖 Chatbot sống xanh</h2>
+<input placeholder="Hỏi AI..." style="width:80%">
+<button>Gửi</button>
+</div>
+
+<div id="score" class="card" style="display:none">
+<h2>🌍 Chấm điểm Công dân xanh</h2>
+<p>Green Score: 82/100</p>
+</div>
+
+<div id="predict" class="card" style="display:none">
+<h2>📊 Dự đoán điện nước</h2>
+<input placeholder="Điện tiêu thụ kWh">
+<button>Dự đoán</button>
+</div>
+
+<div id="advisor" class="card" style="display:none">
+<h2>💬 Tư vấn lối sống bền vững</h2>
+<p>AI đề xuất hành vi thân thiện môi trường.</p>
+</div>
 
 </div>
 
 <script>
 
-function calculate(){
+function show(id){
 
-let e=document.getElementById("electric").value;
-let w=document.getElementById("waste").value;
+let sections=document.querySelectorAll(".card");
 
-let carbon=e*0.85+w*0.5;
+sections.forEach(s=>{
+s.style.display="none";
+});
 
-let score=100-carbon/2;
-
-document.getElementById("result")
-.innerHTML=
-"CO₂: "+carbon.toFixed(2)+
-" kg<br>Green Score: "+
-score.toFixed(0)+"/100";
-
+document.getElementById(id).style.display="block";
 }
 
 </script>
