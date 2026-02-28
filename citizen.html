@@ -3,34 +3,229 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
-<title>Công dân xanh</title>
+<title>Công dân xanh - Đánh giá thông minh</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
 <style>
-
 body{
-background:#eef7f1;
-font-family:Arial;
+background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+font-family: 'Segoe UI', Arial, sans-serif;
+min-height: 100vh;
+padding: 20px;
 }
 
 .box{
-max-width:700px;
-margin:40px auto;
-background:white;
-padding:30px;
-border-radius:15px;
-box-shadow:0px 5px 20px rgba(0,0,0,0.2);
+max-width: 800px;
+margin: 20px auto;
+background: rgba(255, 255, 255, 0.95);
+padding: 40px;
+border-radius: 30px;
+box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+backdrop-filter: blur(10px);
+border: 2px solid rgba(255,255,255,0.5);
+}
+
+h3{
+color: #2d6a4f;
+font-weight: 700;
+margin-bottom: 30px;
+}
+
+h3 i{
+margin-right: 10px;
+color: #40916c;
+}
+
+.question-card{
+background: #f8f9fa;
+padding: 20px;
+border-radius: 20px;
+margin-bottom: 20px;
+border-left: 5px solid #2d6a4f;
+transition: transform 0.2s;
+}
+
+.question-card:hover{
+transform: translateY(-2px);
+box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+label{
+font-weight: 600;
+color: #1b4d3e;
+margin-bottom: 10px;
+font-size: 16px;
+}
+
+label i{
+margin-right: 8px;
+color: #40916c;
+}
+
+.form-select, .form-control{
+border: 2px solid #d4edda;
+border-radius: 15px;
+padding: 12px;
+font-size: 15px;
+transition: all 0.3s;
+}
+
+.form-select:focus, .form-control:focus{
+border-color: #2d6a4f;
+box-shadow: 0 0 0 0.2rem rgba(45,106,79,0.25);
+}
+
+.btn-calculate{
+background: linear-gradient(135deg, #2d6a4f, #40916c);
+color: white;
+border: none;
+padding: 15px 30px;
+border-radius: 50px;
+font-size: 18px;
+font-weight: 600;
+transition: all 0.3s;
+margin: 20px 0;
+}
+
+.btn-calculate:hover{
+transform: translateY(-2px);
+box-shadow: 0 10px 20px rgba(45,106,79,0.3);
 }
 
 .result{
-font-size:22px;
-font-weight:bold;
-margin-top:20px;
-text-align:center;
+padding: 30px;
+border-radius: 25px;
+margin-top: 30px;
+transition: all 0.3s;
 }
 
+.result.excellent{
+background: linear-gradient(135deg, #d4edda, #c3e6cb);
+border: 3px solid #2d6a4f;
+}
+
+.result.good{
+background: linear-gradient(135deg, #fff3cd, #ffe69c);
+border: 3px solid #ffc107;
+}
+
+.result.needs-improvement{
+background: linear-gradient(135deg, #f8d7da, #f5c2c7);
+border: 3px solid #dc3545;
+}
+
+.score-number{
+font-size: 48px;
+font-weight: 700;
+color: #2d6a4f;
+}
+
+.level-badge{
+display: inline-block;
+padding: 8px 20px;
+border-radius: 50px;
+font-size: 18px;
+font-weight: 600;
+margin-bottom: 20px;
+}
+
+.level-excellent{
+background: #2d6a4f;
+color: white;
+}
+
+.level-good{
+background: #ffc107;
+color: #856404;
+}
+
+.level-needs{
+background: #dc3545;
+color: white;
+}
+
+.detail-item{
+background: rgba(255,255,255,0.8);
+padding: 15px;
+border-radius: 15px;
+margin: 10px 0;
+border-left: 4px solid #2d6a4f;
+}
+
+.progress{
+height: 10px;
+border-radius: 10px;
+margin: 10px 0;
+}
+
+.progress-bar{
+background: #2d6a4f;
+border-radius: 10px;
+}
+
+.stat-card{
+background: white;
+padding: 20px;
+border-radius: 20px;
+text-align: center;
+box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+}
+
+.stat-number{
+font-size: 30px;
+font-weight: 700;
+color: #2d6a4f;
+}
+
+.stat-label{
+color: #6c757d;
+font-size: 14px;
+}
+
+.tips-section{
+background: #e8f5e9;
+padding: 20px;
+border-radius: 20px;
+margin-top: 20px;
+}
+
+.tip-item{
+padding: 10px;
+border-bottom: 1px solid #a5d6a7;
+}
+
+.tip-item:last-child{
+border-bottom: none;
+}
+
+.tip-item i{
+color: #2d6a4f;
+margin-right: 10px;
+}
+
+.share-btn{
+background: #4267B2;
+color: white;
+border: none;
+padding: 10px 20px;
+border-radius: 50px;
+margin: 5px;
+transition: all 0.3s;
+}
+
+.share-btn:hover{
+transform: translateY(-2px);
+opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+.box{
+padding: 20px;
+margin: 10px;
+}
+}
 </style>
 </head>
 
@@ -38,77 +233,429 @@ text-align:center;
 
 <div class="box">
 
-<h3 class="text-center">🌱 AI Chấm Điểm Công Dân Xanh</h3>
+<h3 class="text-center">
+<i class="fas fa-leaf"></i> 
+Đánh Giá Công Dân Xanh Thông Minh
+<i class="fas fa-robot" style="color: #40916c;"></i>
+</h3>
 
-<label>Bạn tắt điện khi ra khỏi phòng?</label>
-<select class="form-control" id="q1">
-<option value="10">Luôn luôn</option>
-<option value="5">Thỉnh thoảng</option>
-<option value="0">Hiếm khi</option>
+<p class="text-center text-muted mb-4">
+<i class="fas fa-chart-line"></i> 
+Trả lời 10 câu hỏi để nhận đánh giá chi tiết về lối sống xanh của bạn
+</p>
+
+<!-- Progress Bar -->
+<div class="progress mb-4" style="height: 30px;">
+<div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+     role="progressbar" style="width: 0%">0%</div>
+</div>
+
+<div id="questionsContainer">
+<!-- Câu hỏi 1 -->
+<div class="question-card">
+<label><i class="fas fa-lightbulb"></i> 1. Bạn tắt điện khi ra khỏi phòng?</label>
+<select class="form-select" id="q1">
+<option value="10">🔋 Luôn luôn (10 điểm)</option>
+<option value="5">⚡ Thỉnh thoảng (5 điểm)</option>
+<option value="0">💡 Hiếm khi (0 điểm)</option>
 </select>
+</div>
 
-<br>
-
-<label>Bạn sử dụng túi tái chế?</label>
-<select class="form-control" id="q2">
-<option value="10">Thường xuyên</option>
-<option value="5">Đôi khi</option>
-<option value="0">Không</option>
+<!-- Câu hỏi 2 -->
+<div class="question-card">
+<label><i class="fas fa-shopping-bag"></i> 2. Bạn sử dụng túi tái chế khi mua sắm?</label>
+<select class="form-select" id="q2">
+<option value="10">🛍️ Thường xuyên (10 điểm)</option>
+<option value="5">🛒 Đôi khi (5 điểm)</option>
+<option value="0">🚫 Không bao giờ (0 điểm)</option>
 </select>
+</div>
 
-<br>
-
-<label>Bạn tiết kiệm nước sinh hoạt?</label>
-<select class="form-control" id="q3">
-<option value="10">Có</option>
-<option value="5">Trung bình</option>
-<option value="0">Không</option>
+<!-- Câu hỏi 3 -->
+<div class="question-card">
+<label><i class="fas fa-water"></i> 3. Bạn tiết kiệm nước trong sinh hoạt?</label>
+<select class="form-select" id="q3">
+<option value="10">💧 Rất tiết kiệm (10 điểm)</option>
+<option value="5">🚿 Bình thường (5 điểm)</option>
+<option value="0">🚰 Chưa quan tâm (0 điểm)</option>
 </select>
+</div>
 
-<br>
-
-<label>Bạn phân loại rác?</label>
-<select class="form-control" id="q4">
-<option value="10">Luôn</option>
-<option value="5">Đôi khi</option>
-<option value="0">Không</option>
+<!-- Câu hỏi 4 -->
+<div class="question-card">
+<label><i class="fas fa-trash-alt"></i> 4. Bạn phân loại rác tại nhà?</label>
+<select class="form-select" id="q4">
+<option value="10">♻️ Phân loại kỹ (10 điểm)</option>
+<option value="5">🗑️ Phân loại cơ bản (5 điểm)</option>
+<option value="0">🚮 Chưa phân loại (0 điểm)</option>
 </select>
+</div>
 
-<br>
+<!-- Câu hỏi 5 -->
+<div class="question-card">
+<label><i class="fas fa-bicycle"></i> 5. Phương tiện di chuyển chính của bạn?</label>
+<select class="form-select" id="q5">
+<option value="10">🚲 Xe đạp/Đi bộ (10 điểm)</option>
+<option value="8">🚌 Xe buýt công cộng (8 điểm)</option>
+<option value="5">🛵 Xe máy (5 điểm)</option>
+<option value="0">🚗 Ô tô cá nhân (0 điểm)</option>
+</select>
+</div>
 
-<button class="btn btn-success w-100"
-onclick="calculate()">AI Đánh Giá</button>
+<!-- Câu hỏi 6 -->
+<div class="question-card">
+<label><i class="fas fa-utensils"></i> 6. Bạn có thói quen ăn uống bền vững?</label>
+<select class="form-select" id="q6">
+<option value="10">🥗 Ăn chay thường xuyên (10 điểm)</option>
+<option value="7">🥦 Ăn nhiều rau củ (7 điểm)</option>
+<option value="3">🍖 Ăn uống bình thường (3 điểm)</option>
+<option value="0">🥩 Thường xuyên ăn thịt đỏ (0 điểm)</option>
+</select>
+</div>
 
-<div id="result" class="result"></div>
+<!-- Câu hỏi 7 -->
+<div class="question-card">
+<label><i class="fas fa-solar-panel"></i> 7. Sử dụng năng lượng tái tạo?</label>
+<select class="form-select" id="q7">
+<option value="10">☀️ Có lắp điện mặt trời (10 điểm)</option>
+<option value="5">💡 Dùng đèn năng lượng mặt trời (5 điểm)</option>
+<option value="0">⚡ Chưa sử dụng (0 điểm)</option>
+</select>
+</div>
+
+<!-- Câu hỏi 8 -->
+<div class="question-card">
+<label><i class="fas fa-tree"></i> 8. Bạn có trồng cây xanh?</label>
+<select class="form-select" id="q8">
+<option value="10">🌳 Trồng nhiều cây (10 điểm)</option>
+<option value="5">🌿 Vài chậu cây nhỏ (5 điểm)</option>
+<option value="0">🏠 Không trồng cây (0 điểm)</option>
+</select>
+</div>
+
+<!-- Câu hỏi 9 -->
+<div class="question-card">
+<label><i class="fas fa-recycle"></i> 9. Thói quen tái sử dụng đồ cũ?</label>
+<select class="form-select" id="q9">
+<option value="10">🔄 Tái chế sáng tạo thường xuyên (10 điểm)</option>
+<option value="5">✂️ Thỉnh thoảng tái sử dụng (5 điểm)</option>
+<option value="0">🗑️ Thường mua mới (0 điểm)</option>
+</select>
+</div>
+
+<!-- Câu hỏi 10 -->
+<div class="question-card">
+<label><i class="fas fa-graduation-cap"></i> 10. Tìm hiểu về môi trường?</label>
+<select class="form-select" id="q10">
+<option value="10">📚 Thường xuyên cập nhật kiến thức (10 điểm)</option>
+<option value="5">📰 Thỉnh thoảng đọc tin (5 điểm)</option>
+<option value="0">📱 Ít quan tâm (0 điểm)</option>
+</select>
+</div>
+</div>
+
+<button class="btn btn-calculate w-100" onclick="calculate()">
+<i class="fas fa-robot"></i> AI Phân Tích & Đánh Giá
+</button>
+
+<!-- Kết quả đánh giá -->
+<div id="result" class="result" style="display: none;"></div>
+
+<!-- Thống kê bổ sung -->
+<div class="row mt-4" id="stats" style="display: none;">
+<div class="col-md-4">
+<div class="stat-card">
+<i class="fas fa-star text-warning fs-1"></i>
+<div class="stat-number" id="totalScore">0</div>
+<div class="stat-label">Tổng điểm</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="stat-card">
+<i class="fas fa-tachometer-alt text-info fs-1"></i>
+<div class="stat-number" id="percentScore">0%</div>
+<div class="stat-label">Phần trăm</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="stat-card">
+<i class="fas fa-medal text-primary fs-1"></i>
+<div class="stat-number" id="ranking">0</div>
+<div class="stat-label">Xếp hạng</div>
+</div>
+</div>
+</div>
+
+<!-- Gợi ý cải thiện -->
+<div class="tips-section mt-4" id="tips" style="display: none;">
+<h5><i class="fas fa-lightbulb"></i> Gợi ý cải thiện:</h5>
+<div id="improvementTips"></div>
+</div>
+
+<!-- Nút chia sẻ -->
+<div class="text-center mt-4" id="shareButtons" style="display: none;">
+<button class="share-btn" onclick="shareFacebook()">
+<i class="fab fa-facebook"></i> Chia sẻ
+</button>
+<button class="share-btn" style="background: #25D366;" onclick="shareZalo()">
+<i class="fas fa-comment"></i> Zalo
+</button>
+<button class="share-btn" style="background: #1DA1F2;" onclick="shareTwitter()">
+<i class="fab fa-twitter"></i> Twitter
+</button>
+</div>
 
 </div>
 
 <script>
+// Cơ sở dữ liệu gợi ý cải thiện
+const improvementDatabase = {
+    energy: [
+        "💡 Tắt đèn khi không sử dụng - tiết kiệm 10% điện năng",
+        "⚡ Thay bóng đèn LED tiết kiệm 80% điện năng",
+        "❄️ Đặt điều hòa 26°C thay vì 22°C tiết kiệm 18% điện",
+        "🔌 Rút phích cắm khi không dùng - tránh hao phí điện"
+    ],
+    plastic: [
+        "🛍️ Mang túi vải khi đi chợ - giảm 1000 túi nilon/năm",
+        "🚰 Dùng bình nước cá nhân thay chai nhựa",
+        "🥤 Từ chối ống hút nhựa - mỗi năm 1 người dùng 300 ống hút",
+        "🧴 Chọn sản phẩm bao bì giấy/thủy tinh"
+    ],
+    water: [
+        "🚿 Tắm nhanh 5 phút thay 15 phút - tiết kiệm 150L nước/ngày",
+        "💧 Khóa vòi khi đánh răng - tiết kiệm 40L/ngày",
+        "🌧️ Hứng nước mưa tưới cây",
+        "🔧 Sửa vòi nước rỉ ngay - mỗi giọt/phút = 2000L/năm"
+    ],
+    waste: [
+        "🗑️ Phân loại rác tại nguồn - 3 thùng riêng biệt",
+        "🌱 Ủ rác hữu cơ làm phân bón",
+        "♻️ Tái chế chai nhựa làm chậu cây",
+        "📦 Tái sử dụng hộp giấy, bìa carton"
+    ],
+    transport: [
+        "🚲 Đi xe đạp cho quãng đường dưới 5km",
+        "🚌 Sử dụng xe buýt thay xe máy",
+        "🚶 Đi bộ khi có thể - tốt cho sức khỏe và môi trường",
+        "🛵 Bảo dưỡng xe định kỳ để giảm khí thải"
+    ],
+    food: [
+        "🥗 Áp dụng 'Meatless Monday' - ăn chay 1 ngày/tuần",
+        "🥑 Chọn thực phẩm hữu cơ, địa phương",
+        "🍚 Ăn gạo lứt thay gạo trắng",
+        "🌽 Hạn chế đồ ăn nhanh, đóng gói sẵn"
+    ],
+    general: [
+        "🌳 Trồng thêm cây xanh trong nhà",
+        "📚 Đọc sách về môi trường mỗi tháng",
+        "👨‍👩‍👧‍👦 Dạy con sống xanh từ nhỏ",
+        "🤝 Tham gia các hoạt động bảo vệ môi trường"
+    ]
+};
 
-function calculate(){
+// Danh sách xếp hạng
+const rankings = [
+    { min: 90, title: "🌍 Lãnh đạo Xanh", desc: "Bạn là tấm gương sáng về bảo vệ môi trường!" },
+    { min: 70, title: "🌟 Công dân Xanh xuất sắc", desc: "Lối sống của bạn đang góp phần tích cực bảo vệ hành tinh." },
+    { min: 50, title: "🌱 Công dân thân thiện", desc: "Bạn đang đi đúng hướng, hãy cố gắng thêm!" },
+    { min: 30, title: "🌿 Người mới bắt đầu", desc: "Hãy bắt đầu hành trình xanh ngay hôm nay!" },
+    { min: 0, title: "⚠️ Cần thay đổi", desc: "Môi trường đang cần bạn hành động ngay!" }
+];
 
-let score =
-Number(q1.value)+
-Number(q2.value)+
-Number(q3.value)+
-Number(q4.value);
-
-let level="";
-
-if(score>=35)
-level="🌍 Công dân XANH xuất sắc";
-
-else if(score>=20)
-level="🌱 Công dân thân thiện môi trường";
-
-else
-level="⚠️ Cần cải thiện lối sống xanh";
-
-document.getElementById("result")
-.innerHTML="Điểm AI: "+score+"/40<br>"+level;
-
+function updateProgress() {
+    let answered = 0;
+    for (let i = 1; i <= 10; i++) {
+        let select = document.getElementById(`q${i}`);
+        if (select && select.value) answered++;
+    }
+    let percent = (answered / 10) * 100;
+    let progressBar = document.getElementById('progressBar');
+    progressBar.style.width = percent + '%';
+    progressBar.textContent = Math.round(percent) + '%';
 }
 
+// Cập nhật progress khi thay đổi
+for (let i = 1; i <= 10; i++) {
+    document.getElementById(`q${i}`).addEventListener('change', updateProgress);
+}
+
+function calculate() {
+    let total = 0;
+    let details = [];
+    let weakAreas = [];
+
+    // Tính điểm và phân tích từng câu
+    for (let i = 1; i <= 10; i++) {
+        let select = document.getElementById(`q${i}`);
+        let value = Number(select.value);
+        total += value;
+        
+        // Ghi nhận điểm yếu
+        if (value < 5) {
+            switch(i) {
+                case 1: weakAreas.push('energy'); break;
+                case 2: weakAreas.push('plastic'); break;
+                case 3: weakAreas.push('water'); break;
+                case 4: weakAreas.push('waste'); break;
+                case 5: weakAreas.push('transport'); break;
+                case 6: weakAreas.push('food'); break;
+                default: weakAreas.push('general');
+            }
+        }
+    }
+
+    let maxScore = 100; // 10 câu * 10 điểm
+    let percent = Math.round((total / maxScore) * 100);
+    
+    // Tìm xếp hạng
+    let userRank = rankings.find(r => percent >= r.min) || rankings[rankings.length - 1];
+    
+    // Hiển thị kết quả
+    let resultDiv = document.getElementById('result');
+    resultDiv.style.display = 'block';
+    
+    // Xóa class cũ
+    resultDiv.classList.remove('excellent', 'good', 'needs-improvement');
+    
+    // Thêm class dựa trên điểm
+    if (percent >= 70) {
+        resultDiv.classList.add('excellent');
+    } else if (percent >= 50) {
+        resultDiv.classList.add('good');
+    } else {
+        resultDiv.classList.add('needs-improvement');
+    }
+    
+    // Tạo nội dung kết quả
+    let advice = '';
+    
+    if (percent >= 90) {
+        advice = `
+            <div class="level-badge level-excellent">${userRank.title}</div>
+            <div class="score-number">${total}/100</div>
+            <p class="mt-3">${userRank.desc}</p>
+            <p><i class="fas fa-trophy"></i> Bạn thuộc top 5% người sống xanh nhất!</p>
+        `;
+    } else if (percent >= 70) {
+        advice = `
+            <div class="level-badge level-excellent">${userRank.title}</div>
+            <div class="score-number">${total}/100</div>
+            <p class="mt-3">${userRank.desc}</p>
+        `;
+    } else if (percent >= 50) {
+        advice = `
+            <div class="level-badge level-good">${userRank.title}</div>
+            <div class="score-number">${total}/100</div>
+            <p class="mt-3">${userRank.desc}</p>
+        `;
+    } else {
+        advice = `
+            <div class="level-badge level-needs">${userRank.title}</div>
+            <div class="score-number">${total}/100</div>
+            <p class="mt-3">${userRank.desc}</p>
+        `;
+    }
+    
+    // Thêm thanh progress chi tiết
+    advice += `
+        <div class="mt-4">
+            <p><strong>Tiến độ sống xanh của bạn:</strong></p>
+            <div class="progress">
+                <div class="progress-bar" role="progressbar" style="width: ${percent}%">${percent}%</div>
+            </div>
+        </div>
+    `;
+    
+    resultDiv.innerHTML = advice;
+    
+    // Hiển thị thống kê
+    document.getElementById('stats').style.display = 'flex';
+    document.getElementById('totalScore').textContent = total;
+    document.getElementById('percentScore').textContent = percent + '%';
+    document.getElementById('ranking').textContent = userRank.title.split(' ')[0];
+    
+    // Hiển thị gợi ý cải thiện
+    document.getElementById('tips').style.display = 'block';
+    let tipsHtml = '<div class="row">';
+    
+    // Loại bỏ trùng lặp
+    let uniqueAreas = [...new Set(weakAreas)];
+    
+    if (uniqueAreas.length > 0) {
+        uniqueAreas.forEach(area => {
+            if (improvementDatabase[area]) {
+                let randomTip = improvementDatabase[area][Math.floor(Math.random() * improvementDatabase[area].length)];
+                tipsHtml += `
+                    <div class="col-md-6">
+                        <div class="tip-item">
+                            <i class="fas fa-arrow-right"></i> ${randomTip}
+                        </div>
+                    </div>
+                `;
+            }
+        });
+    } else {
+        // Nếu không có điểm yếu, hiển thị tips nâng cao
+        let advancedTips = [
+            "🌞 Lắp điện mặt trời để tiết kiệm 90% hóa đơn",
+            "🚗 Chuyển sang xe điện giảm 70% khí thải",
+            "🏡 Cải tạo nhà thành không gian xanh",
+            "🌳 Tham gia trồng rừng, bảo vệ môi trường"
+        ];
+        advancedTips.forEach(tip => {
+            tipsHtml += `
+                <div class="col-md-6">
+                    <div class="tip-item">
+                        <i class="fas fa-star"></i> ${tip}
+                    </div>
+                </div>
+            `;
+        });
+    }
+    
+    tipsHtml += '</div>';
+    document.getElementById('improvementTips').innerHTML = tipsHtml;
+    
+    // Hiển thị nút chia sẻ
+    document.getElementById('shareButtons').style.display = 'block';
+    
+    // Animation
+    resultDiv.style.animation = 'fadeIn 0.5s';
+}
+
+// Hàm chia sẻ
+function shareFacebook() {
+    let score = document.getElementById('totalScore').textContent;
+    let percent = document.getElementById('percentScore').textContent;
+    let text = encodeURIComponent(`Tôi đạt ${score} điểm (${percent}) trong bài đánh giá Công dân Xanh! Bạn thử xem mình được bao nhiêu điểm? 🌱`);
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}&quote=${text}`, '_blank');
+}
+
+function shareZalo() {
+    let score = document.getElementById('totalScore').textContent;
+    let text = encodeURIComponent(`Tôi đạt ${score} điểm trong bài đánh giá Công dân Xanh!`);
+    window.open(`https://zalo.me/share?text=${text}&url=${encodeURIComponent(window.location.href)}`, '_blank');
+}
+
+function shareTwitter() {
+    let score = document.getElementById('totalScore').textContent;
+    let text = encodeURIComponent(`Tôi đạt ${score} điểm trong bài đánh giá Công dân Xanh! #SốngXanh #BảoVệMôiTrường`);
+    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(window.location.href)}`, '_blank');
+}
+
+// Animation fadeIn
+const style = document.createElement('style');
+style.textContent = `
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+`;
+document.head.appendChild(style);
+
+// Cập nhật progress ban đầu
+updateProgress();
 </script>
 
 </body>
