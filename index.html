@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AI Sustainable System · nền tảng bền vững</title>
+  <title>AI Sustainable System · Nền tảng bền vững</title>
   <!-- Bootstrap 5 + icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <!-- Bootstrap Icons (thanh lịch) -->
+  <!-- Bootstrap Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
     * {
@@ -22,16 +22,15 @@
       color: #1e293b;
     }
 
-    /* header – tên mới: AI Sustainable System */
     .hero {
       background: linear-gradient(150deg, #0b3328 0%, #1b4f3b 100%);
       color: white;
-      padding: 4rem 1.5rem 5rem;  /* tăng padding dưới để chữ không bị che */
+      padding: 4rem 1.5rem 5rem;
       text-align: center;
       border-bottom-left-radius: 2.2rem;
       border-bottom-right-radius: 2.2rem;
       box-shadow: 0 12px 30px rgba(0, 40, 20, 0.2);
-      margin-bottom: 1rem; /* tạo khoảng đệm trước section */
+      margin-bottom: 1rem;
     }
 
     .hero h1 {
@@ -50,28 +49,25 @@
       font-weight: 350;
     }
 
-    /* section title: KHÔNG BỊ KHUẤT, hiển thị rõ ràng */
     .section-title {
       font-size: 2.2rem;
       font-weight: 600;
       letter-spacing: -0.01em;
       color: #0f2e24;
       text-align: center;
-      margin-top: 1rem;        /* tạo khoảng cách với header */
+      margin-top: 1rem;
       margin-bottom: 2.5rem;
       position: relative;
-      z-index: 3;              /* đảm bảo nằm trên mọi lớp nền */
-      background: transparent;  /* không bị che */
+      z-index: 3;
+      background: transparent;
       padding: 0 1rem;
     }
 
-    /* container section điều chỉnh margin-top dương để chữ không bị header đè */
     .section {
-      margin-top: 1rem;        /* thay vì âm, để title hiện đầy đủ */
+      margin-top: 1rem;
       padding-bottom: 3rem;
     }
 
-    /* card chuẩn app store – padding rộng, chữ clear */
     .feature-card {
       background: white;
       border-radius: 28px;
@@ -93,7 +89,6 @@
       border-color: rgba(55, 140, 95, 0.15);
     }
 
-    /* icon mềm mại, không emoji */
     .card-icon {
       font-size: 3.2rem;
       color: #1d6f4b;
@@ -127,12 +122,17 @@
       max-width: 280px;
     }
 
-    /* grid gutter cân đối */
+    /* điều chỉnh grid cho 4 card: hàng trên 3, hàng dưới 1 (căn giữa) */
+    .row-custom {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
     .g-4 {
       --bs-gutter-y: 2rem;
     }
 
-    /* chú thích cuối trang nhã */
     .footer-note {
       color: #7e9489;
       font-size: 0.9rem;
@@ -142,7 +142,6 @@
       text-align: center;
     }
 
-    /* responsive đẹp */
     @media (max-width: 768px) {
       .hero h1 { font-size: 2.2rem; }
       .section-title { font-size: 1.9rem; margin-top: 0.5rem; }
@@ -154,17 +153,18 @@
 </head>
 <body>
 
-  <!-- HEADER: AI SUSTAINABLE SYSTEM (đã thay Green Intelligence) -->
+  <!-- HEADER -->
   <div class="hero">
     <h1>AI Sustainable System</h1>
     <p>Nền tảng trí tuệ nhân tạo cho phát triển bền vững · Phân tích dữ liệu môi trường · Hành động xanh thông minh</p>
   </div>
 
-  <!-- SECTION: GIẢI PHÁP TRỌNG ĐIỂM – CHỮ HIỂN THỊ ĐẦY ĐỦ, KHÔNG BỊ CHE KHUẤT -->
+  <!-- SECTION: GIẢI PHÁP TRỌNG ĐIỂM (chỉ còn 4 tính năng) -->
   <div class="container section">
     <div class="section-title">Giải pháp trọng điểm</div>
 
-    <div class="row g-4">
+    <!-- hàng 1: 3 card -->
+    <div class="row g-4 row-custom">
       
       <!-- AI NHẬN DIỆN RÁC -->
       <div class="col-md-4">
@@ -181,7 +181,7 @@
       <div class="col-md-4">
         <div class="feature-card" onclick="openPage('chatbot')">
           <div class="card-icon">
-            <i class="bi bi-chat-dots-fill"></i>   <!-- icon chat lịch sự, thay vì wechat -->
+            <i class="bi bi-chat-dots-fill"></i>
           </div>
           <h5>Chatbot Sống xanh</h5>
           <p>Tư vấn thói quen thân thiện môi trường 24/7</p>
@@ -198,9 +198,11 @@
           <p>Chấm điểm bền vững & lộ trình cải thiện dấu chân carbon</p>
         </div>
       </div>
+    </div> <!-- end row 1 -->
 
-      <!-- DỰ ĐOÁN ĐIỆN - NƯỚC -->
-      <div class="col-md-6">
+    <!-- hàng 2: 1 card (dự đoán) căn giữa -->
+    <div class="row g-4 mt-2 justify-content-center">
+      <div class="col-md-6"> <!-- col-md-6 để card vừa phải, căn giữa nhờ justify-content-center -->
         <div class="feature-card" onclick="openPage('predict')">
           <div class="card-icon">
             <i class="bi bi-bar-chart-steps"></i>
@@ -209,21 +211,9 @@
           <p>AI phân tích tiêu thụ, đề xuất tiết kiệm dựa trên hành vi thực tế</p>
         </div>
       </div>
+    </div> <!-- end row 2 -->
 
-      <!-- LỘ TRÌNH TRUNG HÒA CARBON (thay thế mục tư vấn lối sống) -->
-      <div class="col-md-6">
-        <div class="feature-card" onclick="openPage('roadmap')">
-          <div class="card-icon">
-            <i class="bi bi-signpost-split"></i>
-          </div>
-          <h5>Lộ trình trung hòa carbon</h5>
-          <p>Kế hoạch cá nhân hóa giảm phát thải, hướng đến Net Zero</p>
-        </div>
-      </div>
-
-    </div> <!-- end row -->
-
-    <!-- footer chuyên nghiệp, không làm phiền bố cục -->
+    <!-- footer -->
     <div class="footer-note">
       <i class="bi bi-shield-check me-1"></i> Nền tảng thử nghiệm · Dữ liệu minh bạch · Hướng đến phát triển bền vững
     </div>
@@ -236,6 +226,6 @@
     }
   </script>
 
-  <!-- KHÔNG CÒN LỖI CHỮ BỊ KHUẤT: .section có margin-top dương, .hero padding-bottom lớn, .section-title margin-top rõ ràng -->
+  <!-- Đã xóa hoàn toàn "Cổng bản tin VTV Môi trường" và "Lộ trình carbon" -->
 </body>
 </html>
