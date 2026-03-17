@@ -1,1098 +1,674 @@
-import cv2
-import numpy as np
-import torch
-from ultralytics import YOLO
-import mediapipe as mp
-from datetime import datetime
-import threading
-import queue
-import time
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
-from email.mime.multipart import MIMEMultipart
-import os
-import json
-import pandas as pd
-from collections import defaultdict
-import matplotlib.pyplot as plt
-from flask import Flask, render_template, Response, jsonify, request
-import base64
-from io import BytesIO
-from PIL import Image
-import warnings
-warnings.filterwarnings('ignore')
-
-class ClassroomBehaviorAnalyzer:
-    def __init__(self):
-        # Khởi tạo model YOLO cho phát hiện vật thể
-        self.object_model = YOLO('yolov8n.pt')  # Model nhẹ cho object detection
-        
-        # Khởi tạo MediaPipe cho phát hiện pose
-        self.mp_pose = mp.solutions.pose
-        self.pose = self.mp_pose.Pose(
-            static_image_mode=False,
-            model_complexity=1,
-            smooth_landmarks=True,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
-        )
-        self.mp_draw = mp.solutions.drawing_utils
-        self.mp_hands = mp.solutions.hands
-        self.hands = self.mp_hands.Hands(
-            static_image_mode=False,
-            max_num_hands=2,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
-        )
-        
-        # Các lớp đối tượng liên quan đến rác và phá hoại
-        self.trash_classes = {
-            'bottle': 'Chai nhựa',
-            'cup': 'Cốc',
-            'paper': 'Giấy vụn',
-            'plastic bag': 'Túi nilon',
-            'wrapper': 'Bao bì',
-            'tissue': 'Khăn giấy',
-            'can': 'Lon nước',
-            'snack': 'Đồ ăn vặt',
-            'food waste': 'Thức ăn thừa'
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giám sát lớp học thông minh - AI phát hiện vứt rác</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
         
-        self.vandalism_classes = {
-            'scissors': 'Kéo',
-            'knife': 'Dao',
-            'spray': 'Bình xịt',
-            'marker': 'Bút dạ',
-            'broken glass': 'Mảnh vỡ'
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
         }
         
-        # Ngưỡng phát hiện
-        self.trash_threshold = 0.5
-        self.vandalism_threshold = 0.6
-        self.littering_frames_threshold = 15  # Số frame để xác nhận hành vi
-        self.trash_accumulation_threshold = 3  # Số lượng rác tối đa cho phép
-        
-        # Bộ đếm và theo dõi
-        self.littering_frames = defaultdict(int)
-        self.vandalism_frames = defaultdict(int)
-        self.trash_positions = []
-        self.vandalism_positions = []
-        self.alerts = []
-        self.detection_log = []
-        
-        # Queue để xử lý bất đồng bộ
-        self.alert_queue = queue.Queue()
-        self.frame_queue = queue.Queue(maxsize=30)
-        
-        # Thống kê
-        self.stats = {
-            'total_frames': 0,
-            'trash_detections': 0,
-            'littering_events': 0,
-            'vandalism_events': 0,
-            'accumulation_events': 0,
-            'daily_stats': defaultdict(lambda: defaultdict(int))
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
         
-        # Cấu hình email
-        self.email_enabled = False
-        self.email_config = {}
-        
-        # Khởi tạo thread xử lý bất đồng bộ
-        self.start_async_processing()
-        
-    def start_async_processing(self):
-        """Khởi động thread xử lý bất đồng bộ"""
-        self.processing_thread = threading.Thread(target=self.process_alerts, daemon=True)
-        self.processing_thread.start()
-        
-    def process_alerts(self):
-        """Xử lý cảnh báo trong thread riêng"""
-        while True:
-            try:
-                alert = self.alert_queue.get(timeout=1)
-                self._handle_alert(alert)
-            except queue.Empty:
-                continue
-            except Exception as e:
-                print(f"Lỗi xử lý cảnh báo: {str(e)}")
-    
-    def detect_trash_items(self, frame):
-        """Phát hiện các vật thể là rác trong frame"""
-        results = self.object_model(frame, verbose=False)
-        trash_items = []
-        
-        for r in results:
-            boxes = r.boxes
-            for box in boxes:
-                x1, y1, x2, y2 = box.xyxy[0]
-                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-                
-                conf = float(box.conf[0])
-                cls = int(box.cls[0])
-                class_name = self.object_model.names[cls]
-                
-                # Kiểm tra nếu là rác
-                if any(trash in class_name.lower() for trash in ['bottle', 'cup', 'paper', 'plastic', 'can', 'snack', 'wrapper']):
-                    if conf > self.trash_threshold:
-                        trash_items.append({
-                            'bbox': (x1, y1, x2, y2),
-                            'class': class_name,
-                            'confidence': conf,
-                            'center': ((x1 + x2) // 2, (y1 + y2) // 2),
-                            'timestamp': datetime.now().isoformat()
-                        })
-                        
-        return trash_items
-    
-    def detect_vandalism_items(self, frame):
-        """Phát hiện các vật thể có thể dùng để phá hoại"""
-        results = self.object_model(frame, verbose=False)
-        vandalism_items = []
-        
-        for r in results:
-            boxes = r.boxes
-            for box in boxes:
-                x1, y1, x2, y2 = box.xyxy[0]
-                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-                
-                conf = float(box.conf[0])
-                cls = int(box.cls[0])
-                class_name = self.object_model.names[cls]
-                
-                # Kiểm tra vật dụng nguy hiểm
-                dangerous_items = ['scissors', 'knife', 'spray', 'bottle']
-                if any(item in class_name.lower() for item in dangerous_items):
-                    if conf > self.vandalism_threshold:
-                        vandalism_items.append({
-                            'bbox': (x1, y1, x2, y2),
-                            'class': class_name,
-                            'confidence': conf,
-                            'center': ((x1 + x2) // 2, (y1 + y2) // 2),
-                            'timestamp': datetime.now().isoformat()
-                        })
-                        
-        return vandalism_items
-    
-    def detect_littering_behavior(self, frame, hand_landmarks, trash_items):
-        """Phát hiện hành vi vứt rác"""
-        if hand_landmarks is None or len(trash_items) == 0:
-            return False, None
-        
-        h, w, _ = frame.shape
-        detected_littering = False
-        involved_trash = None
-        
-        for hand in hand_landmarks.multi_hand_landmarks:
-            # Lấy tọa độ cổ tay và các ngón tay
-            wrist = hand.landmark[self.mp_hands.HandLandmark.WRIST]
-            index_tip = hand.landmark[self.mp_hands.HandLandmark.INDEX_FINGER_TIP]
-            
-            wrist_pos = (int(wrist.x * w), int(wrist.y * h))
-            index_pos = (int(index_tip.x * w), int(index_tip.y * h))
-            
-            # Tính toán chuyển động của tay
-            for trash in trash_items:
-                trash_center = trash['center']
-                dist_to_hand = np.sqrt((trash_center[0] - wrist_pos[0])**2 + 
-                                      (trash_center[1] - wrist_pos[1])**2)
-                
-                # Nếu tay gần rác, có thể đang cầm
-                if dist_to_hand < 100:
-                    # Theo dõi liên tục trong nhiều frame
-                    trash_id = f"{trash['class']}_{trash['center'][0]}_{trash['center'][1]}"
-                    self.littering_frames[trash_id] += 1
-                    
-                    if self.littering_frames[trash_id] > self.littering_frames_threshold:
-                        detected_littering = True
-                        involved_trash = trash
-                        break
-            
-            if detected_littering:
-                break
-        
-        return detected_littering, involved_trash
-    
-    def detect_vandalism_behavior(self, frame, hand_landmarks, vandalism_items):
-        """Phát hiện hành vi phá hoại"""
-        if hand_landmarks is None or len(vandalism_items) == 0:
-            return False, None
-        
-        h, w, _ = frame.shape
-        detected_vandalism = False
-        involved_item = None
-        
-        for hand in hand_landmarks.multi_hand_landmarks:
-            wrist = hand.landmark[self.mp_hands.HandLandmark.WRIST]
-            wrist_pos = (int(wrist.x * w), int(wrist.y * w))
-            
-            for item in vandalism_items:
-                item_center = item['center']
-                dist = np.sqrt((item_center[0] - wrist_pos[0])**2 + 
-                              (item_center[1] - wrist_pos[1])**2)
-                
-                if dist < 80:  # Tay đang cầm vật nguy hiểm
-                    item_id = f"{item['class']}_{item['center'][0]}_{item['center'][1]}"
-                    self.vandalism_frames[item_id] += 1
-                    
-                    if self.vandalism_frames[item_id] > self.littering_frames_threshold:
-                        detected_vandalism = True
-                        involved_item = item
-                        break
-            
-            if detected_vandalism:
-                break
-        
-        return detected_vandalism, involved_item
-    
-    def detect_trash_accumulation(self, trash_items):
-        """Phát hiện tích tụ rác trong khu vực"""
-        if len(trash_items) >= self.trash_accumulation_threshold:
-            # Tính toán mật độ rác
-            centers = [item['center'] for item in trash_items]
-            if len(centers) > 1:
-                # Tính khoảng cách trung bình giữa các vật thể rác
-                distances = []
-                for i in range(len(centers)):
-                    for j in range(i+1, len(centers)):
-                        dist = np.sqrt((centers[i][0] - centers[j][0])**2 + 
-                                      (centers[i][1] - centers[j][1])**2)
-                        distances.append(dist)
-                
-                avg_distance = np.mean(distances) if distances else float('inf')
-                
-                # Nếu các vật thể rác gần nhau, coi là tích tụ
-                if avg_distance < 200:  # Ngưỡng khoảng cách
-                    # Tính bounding box bao quanh tất cả rác
-                    all_boxes = [item['bbox'] for item in trash_items]
-                    x1 = min([box[0] for box in all_boxes])
-                    y1 = min([box[1] for box in all_boxes])
-                    x2 = max([box[2] for box in all_boxes])
-                    y2 = max([box[3] for box in all_boxes])
-                    
-                    return True, (x1, y1, x2, y2), len(trash_items)
-        
-        return False, None, 0
-    
-    def analyze_classroom_conditions(self, frame, trash_items, vandalism_items):
-        """Phân tích tổng thể điều kiện lớp học"""
-        h, w, _ = frame.shape
-        conditions = {
-            'cleanliness': 100,  # Điểm sạch sẽ (0-100)
-            'safety': 100,       # Điểm an toàn (0-100)
-            'alert_level': 'Thấp',
-            'recommendations': []
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         
-        # Đánh giá độ sạch
-        if len(trash_items) > 0:
-            cleanliness_penalty = min(len(trash_items) * 15, 80)
-            conditions['cleanliness'] = max(0, 100 - cleanliness_penalty)
-            conditions['recommendations'].append(f"Cần dọn dẹp {len(trash_items)} vật thể rác")
-        
-        # Đánh giá an toàn
-        if len(vandalism_items) > 0:
-            safety_penalty = min(len(vandalism_items) * 25, 90)
-            conditions['safety'] = max(0, 100 - safety_penalty)
-            conditions['recommendations'].append(f"Phát hiện {len(vandalism_items)} vật dụng nguy hiểm")
-        
-        # Xác định mức độ cảnh báo
-        if conditions['cleanliness'] < 50 or conditions['safety'] < 50:
-            conditions['alert_level'] = 'Cao'
-        elif conditions['cleanliness'] < 70 or conditions['safety'] < 70:
-            conditions['alert_level'] = 'Trung bình'
-        
-        return conditions
-    
-    def draw_annotations(self, frame, trash_items, vandalism_items, 
-                         littering_info, vandalism_info, accumulation_info, conditions):
-        """Vẽ thông tin lên frame"""
-        # Vẽ bounding box cho rác
-        for trash in trash_items:
-            x1, y1, x2, y2 = trash['bbox']
-            class_name = trash['class']
-            conf = trash['confidence']
-            
-            # Màu sắc dựa trên loại rác
-            color = (0, 255, 255)  # Vàng cho rác thông thường
-            if 'plastic' in class_name.lower():
-                color = (0, 165, 255)  # Cam
-            elif 'bottle' in class_name.lower():
-                color = (255, 255, 0)  # Cyan
-            
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-            cv2.putText(frame, f"{class_name}: {conf:.2f}", (x1, y1-10),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-        
-        # Vẽ bounding box cho vật nguy hiểm
-        for item in vandalism_items:
-            x1, y1, x2, y2 = item['bbox']
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)  # Đỏ
-            cv2.putText(frame, f"NGUY HIEM: {item['class']}", (x1, y1-10),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-        
-        # Vẽ cảnh báo hành vi vứt rác
-        if littering_info[0]:
-            x1, y1, x2, y2 = littering_info[1]['bbox']
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
-            cv2.putText(frame, "⚠️ PHAT HIEN VUT RAC!", (10, 30),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-        
-        # Vẽ cảnh báo phá hoại
-        if vandalism_info[0]:
-            x1, y1, x2, y2 = vandalism_info[1]['bbox']
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 4)
-            cv2.putText(frame, "🚫 CANH BAO PHA HOAI!", (10, 70),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-        
-        # Vẽ cảnh báo tích tụ rác
-        if accumulation_info[0]:
-            x1, y1, x2, y2 = accumulation_info[1]
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 165, 255), 3)
-            cv2.putText(frame, f"📦 RAC TICH TU ({accumulation_info[2]} items)", 
-                       (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 165, 255), 2)
-        
-        # Vẽ thông tin lớp học
-        y_offset = 150
-        cv2.putText(frame, f"🏫 DO SACH: {conditions['cleanliness']}%", (10, y_offset),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        cv2.putText(frame, f"🔒 DO AN TOAN: {conditions['safety']}%", (10, y_offset + 30),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        cv2.putText(frame, f"⚠️ MUC CANH BAO: {conditions['alert_level']}", (10, y_offset + 60),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        
-        # Vẽ thống kê
-        stats_y = y_offset + 100
-        cv2.putText(frame, f"📊 THONG KE:", (10, stats_y),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        cv2.putText(frame, f"Rac: {len(trash_items)} | Vat nguy hiem: {len(vandalism_items)}", 
-                   (10, stats_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        
-        return frame
-    
-    def _handle_alert(self, alert):
-        """Xử lý và lưu cảnh báo"""
-        timestamp = datetime.now()
-        date_str = timestamp.strftime("%Y-%m-%d")
-        
-        # Cập nhật thống kê
-        self.stats['daily_stats'][date_str][alert['type']] += 1
-        
-        if alert['type'] == 'LITTERING':
-            self.stats['littering_events'] += 1
-        elif alert['type'] == 'VANDALISM':
-            self.stats['vandalism_events'] += 1
-        elif alert['type'] == 'ACCUMULATION':
-            self.stats['accumulation_events'] += 1
-        
-        # Lưu ảnh cảnh báo
-        filename = f"alert_{alert['type']}_{timestamp.strftime('%Y%m%d_%H%M%S')}.jpg"
-        cv2.imwrite(f"alerts/{filename}", alert['frame'])
-        
-        # Lưu vào log
-        log_entry = {
-            'timestamp': timestamp.isoformat(),
-            'type': alert['type'],
-            'details': alert['details'],
-            'image': filename,
-            'location': alert.get('location', 'Unknown')
-        }
-        self.detection_log.append(log_entry)
-        
-        # Lưu vào file JSON
-        self.save_log()
-        
-        print(f"\n🔔 CANH BAO: {alert['type']}")
-        print(f"Thoi gian: {timestamp.strftime('%H:%M:%S')}")
-        print(f"Chi tiet: {alert['details']}")
-        print(f"Hinh anh: {filename}")
-        
-        # Gửi email nếu được cấu hình
-        if self.email_enabled:
-            self._send_email_alert(log_entry)
-    
-    def send_alert(self, alert_type, frame, details, location=None):
-        """Gửi cảnh báo vào queue"""
-        alert = {
-            'type': alert_type,
-            'frame': frame.copy(),
-            'details': details,
-            'location': location,
-            'timestamp': datetime.now()
-        }
-        self.alert_queue.put(alert)
-    
-    def _send_email_alert(self, alert):
-        """Gửi cảnh báo qua email"""
-        try:
-            msg = MIMEMultipart()
-            msg['Subject'] = f"🚨 CANH BAO: {alert['type']} trong lop hoc"
-            msg['From'] = self.email_config['from']
-            msg['To'] = self.email_config['to']
-            
-            text = f"""
-            PHAT HIEN HANH VI VI PHAM TRONG LOP HOC
-            
-            Thoi gian: {alert['timestamp']}
-            Loai vi pham: {alert['type']}
-            Chi tiet: {alert['details']}
-            Vi tri: {alert.get('location', 'Khong xac dinh')}
-            
-            Vui long kiem tra va xu ly ngay!
-            
-            ---
-            He thong giám sát lớp học thông minh
-            """
-            
-            msg.attach(MIMEText(text, 'plain', 'utf-8'))
-            
-            # Đính kèm ảnh
-            with open(f"alerts/{alert['image']}", 'rb') as f:
-                img = MIMEImage(f.read())
-                img.add_header('Content-Disposition', 'attachment', filename=alert['image'])
-                msg.attach(img)
-            
-            # Gửi email
-            server = smtplib.SMTP(self.email_config['smtp_server'], self.email_config['smtp_port'])
-            server.starttls()
-            server.login(self.email_config['username'], self.email_config['password'])
-            server.send_message(msg)
-            server.quit()
-            
-            print(f"📧 Da gui email canh bao den {self.email_config['to']}")
-            
-        except Exception as e:
-            print(f"❌ Loi gui email: {str(e)}")
-    
-    def configure_email(self, smtp_server, smtp_port, username, password, from_email, to_email):
-        """Cấu hình gửi email cảnh báo"""
-        self.email_enabled = True
-        self.email_config = {
-            'smtp_server': smtp_server,
-            'smtp_port': smtp_port,
-            'username': username,
-            'password': password,
-            'from': from_email,
-            'to': to_email
+        h1 i {
+            color: #ff4444;
+            animation: pulse 2s infinite;
         }
         
-        # Tạo thư mục alerts nếu chưa có
-        if not os.path.exists('alerts'):
-            os.makedirs('alerts')
-    
-    def save_log(self, filename='detection_log.json'):
-        """Lưu log phát hiện"""
-        with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(self.detection_log, f, ensure_ascii=False, indent=2)
-    
-    def process_frame(self, frame):
-        """Xử lý một frame"""
-        self.stats['total_frames'] += 1
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
         
-        # Chuyển đổi màu sắc
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
         
-        # Phát hiện bàn tay
-        hand_results = self.hands.process(frame_rgb)
+        .monitor-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
         
-        # Phát hiện rác và vật nguy hiểm
-        trash_items = self.detect_trash_items(frame)
-        vandalism_items = self.detect_vandalism_items(frame)
+        .camera-section {
+            background: #f5f5f5;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
         
-        # Cập nhật thống kê
-        self.stats['trash_detections'] += len(trash_items)
-      border-radius: 15px;
-padding: 12px;
-font-size: 15px;
-transition: all 0.3s;
-}
-
-.form-select:focus, .form-control:focus{
-border-color: #2d6a4f;
-box-shadow: 0 0 0 0.2rem rgba(45,106,79,0.25);
-}
-
-.btn-calculate{
-background: linear-gradient(135deg, #2d6a4f, #40916c);
-color: white;
-border: none;
-padding: 15px 30px;
-border-radius: 50px;
-font-size: 18px;
-font-weight: 600;
-transition: all 0.3s;
-margin: 20px 0;
-}
-
-.btn-calculate:hover{
-transform: translateY(-2px);
-box-shadow: 0 10px 20px rgba(45,106,79,0.3);
-}
-
-.result{
-padding: 30px;
-border-radius: 25px;
-margin-top: 30px;
-transition: all 0.3s;
-}
-
-.result.excellent{
-background: linear-gradient(135deg, #d4edda, #c3e6cb);
-border: 3px solid #2d6a4f;
-}
-
-.result.good{
-background: linear-gradient(135deg, #fff3cd, #ffe69c);
-border: 3px solid #ffc107;
-}
-
-.result.needs-improvement{
-background: linear-gradient(135deg, #f8d7da, #f5c2c7);
-border: 3px solid #dc3545;
-}
-
-.score-number{
-font-size: 48px;
-font-weight: 700;
-color: #2d6a4f;
-}
-
-.level-badge{
-display: inline-block;
-padding: 8px 20px;
-border-radius: 50px;
-font-size: 18px;
-font-weight: 600;
-margin-bottom: 20px;
-}
-
-.level-excellent{
-background: #2d6a4f;
-color: white;
-}
-
-.level-good{
-background: #ffc107;
-color: #856404;
-}
-
-.level-needs{
-background: #dc3545;
-color: white;
-}
-
-.detail-item{
-background: rgba(255,255,255,0.8);
-padding: 15px;
-border-radius: 15px;
-margin: 10px 0;
-border-left: 4px solid #2d6a4f;
-}
-
-.progress{
-height: 10px;
-border-radius: 10px;
-margin: 10px 0;
-}
-
-.progress-bar{
-background: #2d6a4f;
-border-radius: 10px;
-}
-
-.stat-card{
-background: white;
-padding: 20px;
-border-radius: 20px;
-text-align: center;
-box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-}
-
-.stat-number{
-font-size: 30px;
-font-weight: 700;
-color: #2d6a4f;
-}
-
-.stat-label{
-color: #6c757d;
-font-size: 14px;
-}
-
-.tips-section{
-background: #e8f5e9;
-padding: 20px;
-border-radius: 20px;
-margin-top: 20px;
-}
-
-.tip-item{
-padding: 10px;
-border-bottom: 1px solid #a5d6a7;
-}
-
-.tip-item:last-child{
-border-bottom: none;
-}
-
-.tip-item i{
-color: #2d6a4f;
-margin-right: 10px;
-}
-
-.share-btn{
-background: #4267B2;
-color: white;
-border: none;
-padding: 10px 20px;
-border-radius: 50px;
-margin: 5px;
-transition: all 0.3s;
-}
-
-.share-btn:hover{
-transform: translateY(-2px);
-opacity: 0.9;
-}
-
-@media (max-width: 768px) {
-.box{
-padding: 20px;
-margin: 10px;
-}
-}
-</style>
+        .camera-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .camera-header h2 {
+            color: #444;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+        
+        .status.active {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .status.inactive {
+            background: #f44336;
+            color: white;
+        }
+        
+        .video-container {
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        
+        #video, #canvas, #outputCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        #canvas, #outputCanvas {
+            display: none;
+        }
+        
+        #outputCanvas {
+            display: block;
+            z-index: 2;
+        }
+        
+        #video {
+            z-index: 1;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76,175,80,0.3);
+        }
+        
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+        
+        .btn-danger:hover:not(:disabled) {
+            background: #da190b;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: #2196F3;
+            color: white;
+        }
+        
+        .btn-secondary:hover:not(:disabled) {
+            background: #0b7dda;
+            transform: translateY(-2px);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .detection-section {
+            background: #f5f5f5;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .detection-section h2 {
+            color: #444;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .stats {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+        
+        .stat-label {
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .stat-value {
+            font-size: 1.2em;
+            color: #333;
+        }
+        
+        .alert {
+            background: #ffeb3b;
+            color: #333;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .alert.show {
+            display: block;
+            animation: slideIn 0.5s;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(-100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .alert.warning {
+            background: #ff9800;
+            color: white;
+        }
+        
+        .alert.danger {
+            background: #f44336;
+            color: white;
+        }
+        
+        .log-section {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .log-entry {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            font-size: 0.9em;
+        }
+        
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        
+        .log-time {
+            color: #666;
+            margin-right: 10px;
+        }
+        
+        .log-message {
+            color: #333;
+        }
+        
+        .log-message.detected {
+            color: #f44336;
+            font-weight: 600;
+        }
+        
+        .model-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 10px;
+            font-size: 0.9em;
+        }
+        
+        .model-info p {
+            margin-bottom: 5px;
+        }
+        
+        .model-tag {
+            display: inline-block;
+            padding: 3px 8px;
+            background: #2196F3;
+            color: white;
+            border-radius: 5px;
+            font-size: 0.8em;
+        }
+    </style>
+    <!-- Load TensorFlow.js và COCO-SSD -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@latest"></script>
 </head>
-
 <body>
-
-<div class="box">
-
-<h3 class="text-center">
-<i class="fas fa-leaf"></i> 
-Đánh Giá Công Dân Xanh Thông Minh
-<i class="fas fa-robot" style="color: #40916c;"></i>
-</h3>
-
-<p class="text-center text-muted mb-4">
-<i class="fas fa-chart-line"></i> 
-Trả lời 10 câu hỏi để nhận đánh giá chi tiết về lối sống xanh của bạn
-</p>
-
-<!-- Progress Bar -->
-<div class="progress mb-4" style="height: 30px;">
-<div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
-     role="progressbar" style="width: 0%">0%</div>
-</div>
-
-<div id="questionsContainer">
-<!-- Câu hỏi 1 -->
-<div class="question-card">
-<label><i class="fas fa-lightbulb"></i> 1. Bạn tắt điện khi ra khỏi phòng?</label>
-<select class="form-select" id="q1">
-<option value="10">🔋 Luôn luôn (10 điểm)</option>
-<option value="5">⚡ Thỉnh thoảng (5 điểm)</option>
-<option value="0">💡 Hiếm khi (0 điểm)</option>
-</select>
-</div>
-
-<!-- Câu hỏi 2 -->
-<div class="question-card">
-<label><i class="fas fa-shopping-bag"></i> 2. Bạn sử dụng túi tái chế khi mua sắm?</label>
-<select class="form-select" id="q2">
-<option value="10">🛍️ Thường xuyên (10 điểm)</option>
-<option value="5">🛒 Đôi khi (5 điểm)</option>
-<option value="0">🚫 Không bao giờ (0 điểm)</option>
-</select>
-</div>
-
-<!-- Câu hỏi 3 -->
-<div class="question-card">
-<label><i class="fas fa-water"></i> 3. Bạn tiết kiệm nước trong sinh hoạt?</label>
-<select class="form-select" id="q3">
-<option value="10">💧 Rất tiết kiệm (10 điểm)</option>
-<option value="5">🚿 Bình thường (5 điểm)</option>
-<option value="0">🚰 Chưa quan tâm (0 điểm)</option>
-</select>
-</div>
-
-<!-- Câu hỏi 4 -->
-<div class="question-card">
-<label><i class="fas fa-trash-alt"></i> 4. Bạn phân loại rác tại nhà?</label>
-<select class="form-select" id="q4">
-<option value="10">♻️ Phân loại kỹ (10 điểm)</option>
-<option value="5">🗑️ Phân loại cơ bản (5 điểm)</option>
-<option value="0">🚮 Chưa phân loại (0 điểm)</option>
-</select>
-</div>
-
-<!-- Câu hỏi 5 -->
-<div class="question-card">
-<label><i class="fas fa-bicycle"></i> 5. Phương tiện di chuyển chính của bạn?</label>
-<select class="form-select" id="q5">
-<option value="10">🚲 Xe đạp/Đi bộ (10 điểm)</option>
-<option value="8">🚌 Xe buýt công cộng (8 điểm)</option>
-<option value="5">🛵 Xe máy (5 điểm)</option>
-<option value="0">🚗 Ô tô cá nhân (0 điểm)</option>
-</select>
-</div>
-
-<!-- Câu hỏi 6 -->
-<div class="question-card">
-<label><i class="fas fa-utensils"></i> 6. Bạn có thói quen ăn uống bền vững?</label>
-<select class="form-select" id="q6">
-<option value="10">🥗 Ăn chay thường xuyên (10 điểm)</option>
-<option value="7">🥦 Ăn nhiều rau củ (7 điểm)</option>
-<option value="3">🍖 Ăn uống bình thường (3 điểm)</option>
-<option value="0">🥩 Thường xuyên ăn thịt đỏ (0 điểm)</option>
-</select>
-</div>
-
-<!-- Câu hỏi 7 -->
-<div class="question-card">
-<label><i class="fas fa-solar-panel"></i> 7. Sử dụng năng lượng tái tạo?</label>
-<select class="form-select" id="q7">
-<option value="10">☀️ Có lắp điện mặt trời (10 điểm)</option>
-<option value="5">💡 Dùng đèn năng lượng mặt trời (5 điểm)</option>
-<option value="0">⚡ Chưa sử dụng (0 điểm)</option>
-</select>
-</div>
-
-<!-- Câu hỏi 8 -->
-<div class="question-card">
-<label><i class="fas fa-tree"></i> 8. Bạn có trồng cây xanh?</label>
-<select class="form-select" id="q8">
-<option value="10">🌳 Trồng nhiều cây (10 điểm)</option>
-<option value="5">🌿 Vài chậu cây nhỏ (5 điểm)</option>
-<option value="0">🏠 Không trồng cây (0 điểm)</option>
-</select>
-</div>
-
-<!-- Câu hỏi 9 -->
-<div class="question-card">
-<label><i class="fas fa-recycle"></i> 9. Thói quen tái sử dụng đồ cũ?</label>
-<select class="form-select" id="q9">
-<option value="10">🔄 Tái chế sáng tạo thường xuyên (10 điểm)</option>
-<option value="5">✂️ Thỉnh thoảng tái sử dụng (5 điểm)</option>
-<option value="0">🗑️ Thường mua mới (0 điểm)</option>
-</select>
-</div>
-
-<!-- Câu hỏi 10 -->
-<div class="question-card">
-<label><i class="fas fa-graduation-cap"></i> 10. Tìm hiểu về môi trường?</label>
-<select class="form-select" id="q10">
-<option value="10">📚 Thường xuyên cập nhật kiến thức (10 điểm)</option>
-<option value="5">📰 Thỉnh thoảng đọc tin (5 điểm)</option>
-<option value="0">📱 Ít quan tâm (0 điểm)</option>
-</select>
-</div>
-</div>
-
-<button class="btn btn-calculate w-100" onclick="calculate()">
-<i class="fas fa-robot"></i> AI Phân Tích & Đánh Giá
-</button>
-
-<!-- Kết quả đánh giá -->
-<div id="result" class="result" style="display: none;"></div>
-
-<!-- Thống kê bổ sung -->
-<div class="row mt-4" id="stats" style="display: none;">
-<div class="col-md-4">
-<div class="stat-card">
-<i class="fas fa-star text-warning fs-1"></i>
-<div class="stat-number" id="totalScore">0</div>
-<div class="stat-label">Tổng điểm</div>
-</div>
-</div>
-<div class="col-md-4">
-<div class="stat-card">
-<i class="fas fa-tachometer-alt text-info fs-1"></i>
-<div class="stat-number" id="percentScore">0%</div>
-<div class="stat-label">Phần trăm</div>
-</div>
-</div>
-<div class="col-md-4">
-<div class="stat-card">
-<i class="fas fa-medal text-primary fs-1"></i>
-<div class="stat-number" id="ranking">0</div>
-<div class="stat-label">Xếp hạng</div>
-</div>
-</div>
-</div>
-
-<!-- Gợi ý cải thiện -->
-<div class="tips-section mt-4" id="tips" style="display: none;">
-<h5><i class="fas fa-lightbulb"></i> Gợi ý cải thiện:</h5>
-<div id="improvementTips"></div>
-</div>
-
-<!-- Nút chia sẻ -->
-<div class="text-center mt-4" id="shareButtons" style="display: none;">
-<button class="share-btn" onclick="shareFacebook()">
-<i class="fab fa-facebook"></i> Chia sẻ
-</button>
-<button class="share-btn" style="background: #25D366;" onclick="shareZalo()">
-<i class="fas fa-comment"></i> Zalo
-</button>
-<button class="share-btn" style="background: #1DA1F2;" onclick="shareTwitter()">
-<i class="fab fa-twitter"></i> Twitter
-</button>
-</div>
-
-</div>
-
-<script>
-// Cơ sở dữ liệu gợi ý cải thiện
-const improvementDatabase = {
-    energy: [
-        "💡 Tắt đèn khi không sử dụng - tiết kiệm 10% điện năng",
-        "⚡ Thay bóng đèn LED tiết kiệm 80% điện năng",
-        "❄️ Đặt điều hòa 26°C thay vì 22°C tiết kiệm 18% điện",
-        "🔌 Rút phích cắm khi không dùng - tránh hao phí điện"
-    ],
-    plastic: [
-        "🛍️ Mang túi vải khi đi chợ - giảm 1000 túi nilon/năm",
-        "🚰 Dùng bình nước cá nhân thay chai nhựa",
-        "🥤 Từ chối ống hút nhựa - mỗi năm 1 người dùng 300 ống hút",
-        "🧴 Chọn sản phẩm bao bì giấy/thủy tinh"
-    ],
-    water: [
-        "🚿 Tắm nhanh 5 phút thay 15 phút - tiết kiệm 150L nước/ngày",
-        "💧 Khóa vòi khi đánh răng - tiết kiệm 40L/ngày",
-        "🌧️ Hứng nước mưa tưới cây",
-        "🔧 Sửa vòi nước rỉ ngay - mỗi giọt/phút = 2000L/năm"
-    ],
-    waste: [
-        "🗑️ Phân loại rác tại nguồn - 3 thùng riêng biệt",
-        "🌱 Ủ rác hữu cơ làm phân bón",
-        "♻️ Tái chế chai nhựa làm chậu cây",
-        "📦 Tái sử dụng hộp giấy, bìa carton"
-    ],
-    transport: [
-        "🚲 Đi xe đạp cho quãng đường dưới 5km",
-        "🚌 Sử dụng xe buýt thay xe máy",
-        "🚶 Đi bộ khi có thể - tốt cho sức khỏe và môi trường",
-        "🛵 Bảo dưỡng xe định kỳ để giảm khí thải"
-    ],
-    food: [
-        "🥗 Áp dụng 'Meatless Monday' - ăn chay 1 ngày/tuần",
-        "🥑 Chọn thực phẩm hữu cơ, địa phương",
-        "🍚 Ăn gạo lứt thay gạo trắng",
-        "🌽 Hạn chế đồ ăn nhanh, đóng gói sẵn"
-    ],
-    general: [
-        "🌳 Trồng thêm cây xanh trong nhà",
-        "📚 Đọc sách về môi trường mỗi tháng",
-        "👨‍👩‍👧‍👦 Dạy con sống xanh từ nhỏ",
-        "🤝 Tham gia các hoạt động bảo vệ môi trường"
-    ]
-};
-
-// Danh sách xếp hạng
-const rankings = [
-    { min: 90, title: "🌍 Lãnh đạo Xanh", desc: "Bạn là tấm gương sáng về bảo vệ môi trường!" },
-    { min: 70, title: "🌟 Công dân Xanh xuất sắc", desc: "Lối sống của bạn đang góp phần tích cực bảo vệ hành tinh." },
-    { min: 50, title: "🌱 Công dân thân thiện", desc: "Bạn đang đi đúng hướng, hãy cố gắng thêm!" },
-    { min: 30, title: "🌿 Người mới bắt đầu", desc: "Hãy bắt đầu hành trình xanh ngay hôm nay!" },
-    { min: 0, title: "⚠️ Cần thay đổi", desc: "Môi trường đang cần bạn hành động ngay!" }
-];
-
-function updateProgress() {
-    let answered = 0;
-    for (let i = 1; i <= 10; i++) {
-        let select = document.getElementById(`q${i}`);
-        if (select && select.value) answered++;
-    }
-    let percent = (answered / 10) * 100;
-    let progressBar = document.getElementById('progressBar');
-    progressBar.style.width = percent + '%';
-    progressBar.textContent = Math.round(percent) + '%';
-}
-
-// Cập nhật progress khi thay đổi
-for (let i = 1; i <= 10; i++) {
-    document.getElementById(`q${i}`).addEventListener('change', updateProgress);
-}
-
-function calculate() {
-    let total = 0;
-    let details = [];
-    let weakAreas = [];
-
-    // Tính điểm và phân tích từng câu
-    for (let i = 1; i <= 10; i++) {
-        let select = document.getElementById(`q${i}`);
-        let value = Number(select.value);
-        total += value;
+    <div class="container">
+        <h1>
+            🎥 Giám sát lớp học thông minh
+            <i>●</i>
+        </h1>
+        <p class="subtitle">Phát hiện hành vi vứt rác bừa bãi và các vật thể bất thường trong lớp học</p>
         
-        // Ghi nhận điểm yếu
-        if (value < 5) {
-            switch(i) {
-                case 1: weakAreas.push('energy'); break;
-                case 2: weakAreas.push('plastic'); break;
-                case 3: weakAreas.push('water'); break;
-                case 4: weakAreas.push('waste'); break;
-                case 5: weakAreas.push('transport'); break;
-                case 6: weakAreas.push('food'); break;
-                default: weakAreas.push('general');
-            }
-        }
-    }
-
-    let maxScore = 100; // 10 câu * 10 điểm
-    let percent = Math.round((total / maxScore) * 100);
-    
-    // Tìm xếp hạng
-    let userRank = rankings.find(r => percent >= r.min) || rankings[rankings.length - 1];
-    
-    // Hiển thị kết quả
-    let resultDiv = document.getElementById('result');
-    resultDiv.style.display = 'block';
-    
-    // Xóa class cũ
-    resultDiv.classList.remove('excellent', 'good', 'needs-improvement');
-    
-    // Thêm class dựa trên điểm
-    if (percent >= 70) {
-        resultDiv.classList.add('excellent');
-    } else if (percent >= 50) {
-        resultDiv.classList.add('good');
-    } else {
-        resultDiv.classList.add('needs-improvement');
-    }
-    
-    // Tạo nội dung kết quả
-    let advice = '';
-    
-    if (percent >= 90) {
-        advice = `
-            <div class="level-badge level-excellent">${userRank.title}</div>
-            <div class="score-number">${total}/100</div>
-            <p class="mt-3">${userRank.desc}</p>
-            <p><i class="fas fa-trophy"></i> Bạn thuộc top 5% người sống xanh nhất!</p>
-        `;
-    } else if (percent >= 70) {
-        advice = `
-            <div class="level-badge level-excellent">${userRank.title}</div>
-            <div class="score-number">${total}/100</div>
-            <p class="mt-3">${userRank.desc}</p>
-        `;
-    } else if (percent >= 50) {
-        advice = `
-            <div class="level-badge level-good">${userRank.title}</div>
-            <div class="score-number">${total}/100</div>
-            <p class="mt-3">${userRank.desc}</p>
-        `;
-    } else {
-        advice = `
-            <div class="level-badge level-needs">${userRank.title}</div>
-            <div class="score-number">${total}/100</div>
-            <p class="mt-3">${userRank.desc}</p>
-        `;
-    }
-    
-    // Thêm thanh progress chi tiết
-    advice += `
-        <div class="mt-4">
-            <p><strong>Tiến độ sống xanh của bạn:</strong></p>
-            <div class="progress">
-                <div class="progress-bar" role="progressbar" style="width: ${percent}%">${percent}%</div>
+        <div class="monitor-grid">
+            <!-- Camera Section -->
+            <div class="camera-section">
+                <div class="camera-header">
+                    <h2>
+                        <span>📹</span> Camera quan sát
+                    </h2>
+                    <span class="status inactive" id="cameraStatus">Chưa kết nối</span>
+                </div>
+                
+                <div class="video-container">
+                    <video id="video" autoplay playsinline></video>
+                    <canvas id="canvas"></canvas>
+                    <canvas id="outputCanvas"></canvas>
+                </div>
+                
+                <div class="controls">
+                    <button class="btn-primary" id="startCamera" onclick="startCamera()">
+                        <span>📷</span> Bật camera
+                    </button>
+                    <button class="btn-danger" id="stopCamera" onclick="stopCamera()" disabled>
+                        <span>⏹️</span> Tắt camera
+                    </button>
+                    <button class="btn-secondary" id="startDetection" onclick="startDetection()" disabled>
+                        <span>🔍</span> Bắt đầu phát hiện
+                    </button>
+                    <button class="btn-secondary" id="stopDetection" onclick="stopDetection()" disabled>
+                        <span>⏸️</span> Dừng phát hiện
+                    </button>
+                </div>
             </div>
-        </div>
-    `;
-    
-    resultDiv.innerHTML = advice;
-    
-    // Hiển thị thống kê
-    document.getElementById('stats').style.display = 'flex';
-    document.getElementById('totalScore').textContent = total;
-    document.getElementById('percentScore').textContent = percent + '%';
-    document.getElementById('ranking').textContent = userRank.title.split(' ')[0];
-    
-    // Hiển thị gợi ý cải thiện
-    document.getElementById('tips').style.display = 'block';
-    let tipsHtml = '<div class="row">';
-    
-    // Loại bỏ trùng lặp
-    let uniqueAreas = [...new Set(weakAreas)];
-    
-    if (uniqueAreas.length > 0) {
-        uniqueAreas.forEach(area => {
-            if (improvementDatabase[area]) {
-                let randomTip = improvementDatabase[area][Math.floor(Math.random() * improvementDatabase[area].length)];
-                tipsHtml += `
-                    <div class="col-md-6">
-                        <div class="tip-item">
-                            <i class="fas fa-arrow-right"></i> ${randomTip}
-                        </div>
+            
+            <!-- Detection Section -->
+            <div class="detection-section">
+                <h2>
+                    <span>📊</span> Thông số giám sát
+                </h2>
+                
+                <div class="stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Trạng thái AI:</span>
+                        <span class="stat-value" id="aiStatus">Chưa sẵn sàng</span>
                     </div>
-                `;
-            }
-        });
-    } else {
-        // Nếu không có điểm yếu, hiển thị tips nâng cao
-        let advancedTips = [
-            "🌞 Lắp điện mặt trời để tiết kiệm 90% hóa đơn",
-            "🚗 Chuyển sang xe điện giảm 70% khí thải",
-            "🏡 Cải tạo nhà thành không gian xanh",
-            "🌳 Tham gia trồng rừng, bảo vệ môi trường"
-        ];
-        advancedTips.forEach(tip => {
-            tipsHtml += `
-                <div class="col-md-6">
-                    <div class="tip-item">
-                        <i class="fas fa-star"></i> ${tip}
+                    <div class="stat-item">
+                        <span class="stat-label">Số vật thể phát hiện:</span>
+                        <span class="stat-value" id="objectCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Số lần vứt rác:</span>
+                        <span class="stat-value" id="trashCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Cảnh báo:</span>
+                        <span class="stat-value" id="alertCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Độ chính xác:</span>
+                        <span class="stat-value" id="accuracy">--</span>
                     </div>
                 </div>
+                
+                <div class="alert" id="alertBox">
+                    <strong>⚠️ CẢNH BÁO!</strong> Phát hiện hành vi vứt rác
+                </div>
+                
+                <h3>📝 Nhật ký phát hiện</h3>
+                <div class="log-section" id="logSection">
+                    <div class="log-entry">
+                        <span class="log-time">⏰</span>
+                        <span class="log-message">Sẵn sàng giám sát. Bật camera để bắt đầu.</span>
+                    </div>
+                </div>
+                
+                <div class="model-info">
+                    <p><span class="model-tag">🤖 AI Model</span> COCO-SSD (MobileNet)</p>
+                    <p>🎯 Phát hiện: người, chai lọ, túi nilon, thức ăn thừa, giấy vụn</p>
+                    <p>⚡ Thời gian thực | Cập nhật mỗi 200ms</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let video = document.getElementById('video');
+        let canvas = document.getElementById('canvas');
+        let outputCanvas = document.getElementById('outputCanvas');
+        let ctx = outputCanvas.getContext('2d');
+        let model = null;
+        let stream = null;
+        let detectionInterval = null;
+        let isDetecting = false;
+        
+        // Statistics
+        let trashCount = 0;
+        let alertCount = 0;
+        let totalDetections = 0;
+        let correctDetections = 0;
+        
+        // Các loại rác cần phát hiện
+        const trashClasses = [
+            'bottle', 'cup', 'fork', 'knife', 'spoon', 'bowl',
+            'banana', 'apple', 'sandwich', 'orange', 'broccoli',
+            'carrot', 'hot dog', 'pizza', 'donut', 'cake',
+            'book', 'paper', 'napkin', 'tissue'
+        ];
+        
+        // Load model khi trang load
+        async function loadModel() {
+            try {
+                document.getElementById('aiStatus').innerText = 'Đang tải model...';
+                model = await cocoSsd.load();
+                document.getElementById('aiStatus').innerHTML = '✅ Đã sẵn sàng';
+                console.log('Model loaded successfully');
+                return true;
+            } catch (error) {
+                console.error('Error loading model:', error);
+                document.getElementById('aiStatus').innerHTML = '❌ Lỗi tải model';
+                return false;
+            }
+        }
+        
+        // Bật camera
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: 640, 
+                        height: 480,
+                        facingMode: 'environment'
+                    } 
+                });
+                video.srcObject = stream;
+                
+                // Đợi video sẵn sàng
+                video.onloadedmetadata = () => {
+                    // Cấu hình canvas
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    outputCanvas.width = video.videoWidth;
+                    outputCanvas.height = video.videoHeight;
+                    
+                    // Vẽ frame đầu tiên
+                    drawVideoToCanvas();
+                };
+                
+                document.getElementById('cameraStatus').innerText = 'Đang hoạt động';
+                document.getElementById('cameraStatus').className = 'status active';
+                document.getElementById('startCamera').disabled = true;
+                document.getElementById('stopCamera').disabled = false;
+                document.getElementById('startDetection').disabled = false;
+                
+                addLog('📷 Camera đã được bật');
+                
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                alert('Không thể truy cập camera. Vui lòng kiểm tra quyền truy cập.');
+            }
+        }
+        
+        // Tắt camera
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            
+            stopDetection();
+            
+            document.getElementById('cameraStatus').innerText = 'Chưa kết nối';
+            document.getElementById('cameraStatus').className = 'status inactive';
+            document.getElementById('startCamera').disabled = false;
+            document.getElementById('stopCamera').disabled = true;
+            document.getElementById('startDetection').disabled = true;
+            
+            // Xóa canvas
+            ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+            
+            addLog('📴 Camera đã tắt');
+        }
+        
+        // Vẽ video lên canvas
+        function drawVideoToCanvas() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                ctx.drawImage(video, 0, 0, outputCanvas.width, outputCanvas.height);
+            }
+        }
+        
+        // Bắt đầu phát hiện
+        function startDetection() {
+            if (!model) {
+                alert('Model chưa được tải xong. Vui lòng đợi...');
+                return;
+            }
+            
+            isDetecting = true;
+            document.getElementById('startDetection').disabled = true;
+            document.getElementById('stopDetection').disabled = false;
+            
+            // Chạy phát hiện mỗi 200ms
+            detectionInterval = setInterval(detectObjects, 200);
+            
+            addLog('🔍 Bắt đầu giám sát AI');
+        }
+        
+        // Dừng phát hiện
+        function stopDetection() {
+            isDetecting = false;
+            if (detectionInterval) {
+                clearInterval(detectionInterval);
+                detectionInterval = null;
+            }
+            
+            document.getElementById('startDetection').disabled = false;
+            document.getElementById('stopDetection').disabled = true;
+            
+            addLog('⏸️ Tạm dừng giám sát');
+        }
+        
+        // Phát hiện vật thể
+        async function detectObjects() {
+            if (!isDetecting || !model || video.readyState !== video.HAVE_ENOUGH_DATA) {
+                return;
+            }
+            
+            try {
+                // Vẽ frame hiện tại
+                drawVideoToCanvas();
+                
+                // Phát hiện objects
+                const predictions = await model.detect(video);
+                
+                // Cập nhật số lượng
+                document.getElementById('objectCount').innerText = predictions.length;
+                
+                // Vẽ kết quả lên canvas
+                ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+                ctx.drawImage(video, 0, 0, outputCanvas.width, outputCanvas.height);
+                
+                let trashDetected = false;
+                let detectionResults = [];
+                
+                predictions.forEach(prediction => {
+                    const [x, y, width, height] = prediction.bbox;
+                    const score = Math.round(prediction.score * 100);
+                    
+                    // Kiểm tra nếu là rác
+                    const isTrash = trashClasses.includes(prediction.class);
+                    
+                    // Vẽ bounding box
+                    ctx.strokeStyle = isTrash ? '#ff4444' : '#00ff00';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(x, y, width, height);
+                    
+                    // Vẽ label
+                    ctx.fillStyle = isTrash ? '#ff4444' : '#00ff00';
+                    ctx.font = '16px Arial';
+                    ctx.fillText(
+                        `${prediction.class} (${score}%)`,
+                        x, y > 20 ? y - 5 : y + 20
+                    );
+                    
+                    if (isTrash && score > 60) {
+                        trashDetected = true;
+                        detectionResults.push(`${prediction.class} (${score}%)`);
+                    }
+                    
+                    // Cập nhật độ chính xác
+                    totalDetections++;
+                    if (isTrash) {
+                        correctDetections++;
+                    }
+                });
+                
+                // Xử lý khi phát hiện rác
+                if (trashDetected) {
+                    trashCount++;
+                    alertCount++;
+                    
+                    document.getElementById('trashCount').innerText = trashCount;
+                    document.getElementById('alertCount').innerText = alertCount;
+                    
+                    // Hiện cảnh báo
+                    const alertBox = document.getElementById('alertBox');
+                    alertBox.className = 'alert danger show';
+                    alertBox.innerHTML = `⚠️ CẢNH BÁO! Phát hiện rác: ${detectionResults.join(', ')}`;
+                    
+                    // Thêm vào nhật ký
+                    addLog(`🚮 Phát hiện rác: ${detectionResults.join(', ')}`, true);
+                    
+                    // Ẩn cảnh báo sau 3 giây
+                    setTimeout(() => {
+                        alertBox.classList.remove('show');
+                    }, 3000);
+                }
+                
+                // Cập nhật độ chính xác
+                if (totalDetections > 0) {
+                    const accuracy = Math.round((correctDetections / totalDetections) * 100);
+                    document.getElementById('accuracy').innerText = accuracy + '%';
+                }
+                
+            } catch (error) {
+                console.error('Detection error:', error);
+            }
+        }
+        
+        // Thêm log
+        function addLog(message, isAlert = false) {
+            const logSection = document.getElementById('logSection');
+            const time = new Date().toLocaleTimeString('vi-VN');
+            
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.innerHTML = `
+                <span class="log-time">[${time}]</span>
+                <span class="log-message ${isAlert ? 'detected' : ''}">${message}</span>
             `;
-        });
-    }
-    
-    tipsHtml += '</div>';
-    document.getElementById('improvementTips').innerHTML = tipsHtml;
-    
-    // Hiển thị nút chia sẻ
-    document.getElementById('shareButtons').style.display = 'block';
-    
-    // Animation
-    resultDiv.style.animation = 'fadeIn 0.5s';
-}
-
-// Hàm chia sẻ
-function shareFacebook() {
-    let score = document.getElementById('totalScore').textContent;
-    let percent = document.getElementById('percentScore').textContent;
-    let text = encodeURIComponent(`Tôi đạt ${score} điểm (${percent}) trong bài đánh giá Công dân Xanh! Bạn thử xem mình được bao nhiêu điểm? 🌱`);
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}&quote=${text}`, '_blank');
-}
-
-function shareZalo() {
-    let score = document.getElementById('totalScore').textContent;
-    let text = encodeURIComponent(`Tôi đạt ${score} điểm trong bài đánh giá Công dân Xanh!`);
-    window.open(`https://zalo.me/share?text=${text}&url=${encodeURIComponent(window.location.href)}`, '_blank');
-}
-
-function shareTwitter() {
-    let score = document.getElementById('totalScore').textContent;
-    let text = encodeURIComponent(`Tôi đạt ${score} điểm trong bài đánh giá Công dân Xanh! #SốngXanh #BảoVệMôiTrường`);
-    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(window.location.href)}`, '_blank');
-}
-
-// Animation fadeIn
-const style = document.createElement('style');
-style.textContent = `
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-`;
-document.head.appendChild(style);
-
-// Cập nhật progress ban đầu
-updateProgress();
-</script>
-
+            
+            logSection.insertBefore(logEntry, logSection.firstChild);
+            
+            // Giới hạn số log
+            if (logSection.children.length > 50) {
+                logSection.removeChild(logSection.lastChild);
+            }
+        }
+        
+        // Khởi tạo model khi trang load
+        window.onload = () => {
+            loadModel();
+            addLog('🚀 Hệ thống đã sẵn sàng');
+        };
+        
+        // Dọn dẹp khi rời trang
+        window.onbeforeunload = () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            if (detectionInterval) {
+                clearInterval(detectionInterval);
+            }
+        };
+    </script>
 </body>
 </html>
